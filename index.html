@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>酷炫页面</title>
+    <style>
+        /* ====== 全局重置 ====== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0a0a12;
+            overflow: hidden;
+            color: #fff;
+        }
+
+        /* ====== 背景 Canvas ====== */
+        #bg-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+        }
+
+        /* ====== 主内容卡片 ====== */
+        .hero {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 3rem 4rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            backdrop-filter: blur(18px);
+            box-shadow: 0 0 60px rgba(100, 100, 255, 0.15);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: default;
+            user-select: none;
+        }
+        .hero:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 80px rgba(100, 100, 255, 0.3);
+        }
+
+        .hero h1 {
+            font-size: 4rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #f093fb, #f5576c, #4facfe, #00f2fe);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradient-shift 5s ease infinite;
+            margin-bottom: 0.75rem;
+        }
+
+        .hero p {
+            font-size: 1.15rem;
+            color: rgba(255, 255, 255, 0.65);
+            letter-spacing: 1px;
+            margin-bottom: 2rem;
+        }
+
+        /* ====== 按钮 ====== */
+        .btn {
+            display: inline-block;
+            padding: 0.8rem 2.4rem;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #fff;
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(79, 172, 254, 0.45);
+        }
+        .btn:hover::after {
+            opacity: 1;
+        }
+        .btn:active {
+            transform: scale(0.96);
+        }
+
+        /* ====== 点击涟漪特效容器 ====== */
+        #ripple-container {
+            position: fixed;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+        }
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            animation: ripple-anim 1s ease-out forwards;
+        }
+
+        /* ====== 动画关键帧 ====== */
+        @keyframes gradient-shift {
+            0%, 100% { background-position: 0% 50%; }
+            50%      { background-position: 100% 50%; }
+        }
+        @keyframes ripple-anim {
+            0%   { width: 0; height: 0; opacity: 1; }
+            100% { width: 300px; height: 300px; opacity: 0; }
+        }
+
+        /* ====== 响应式 ====== */
+        @media (max-width: 600px) {
+            .hero { padding: 2rem 1.5rem; }
+            .hero h1 { font-size: 2.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 背景粒子动画 -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- 中间卡片 -->
+    <div class="hero">
+        <h1>✨ 酷炫空间</h1>
+        <p>移动鼠标 · 点击页面 · 感受粒子</p>
+        <button class="btn" id="magic-btn">💥 点我试试</button>
+    </div>
+
+    <!-- 点击涟漪层 -->
+    <div id="ripple-container"></div>
+
+    <script>
+        // =============================================
+        //  1. 粒子背景
+        // =============================================
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let W, H, particles = [];
+
+        function resize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const COUNT = 120;
+        const MAX_DIST = 150;
+
+        class Particle {
+            constructor() {
+                this.reset(true);
+            }
+            reset(initial = false) {
+                this.x = Math.random() * W;
+                this.y = Math.random() * H;
+                this.size = Math.random() * 2.5 + 1;
+                this.speedX = (Math.random() - 0.5) * 0.8;
+                this.speedY = (Math.random() - 0.5) * 0.8;
+                this.opacity = Math.random() * 0.6 + 0.2;
+                if (!initial) {
+                    // 超出边界时重新生成，显得更自然
+                    this.x = Math.random() * W;
+                    this.y = -5;
+                }
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                // 边界回绕
+                if (this.x < -10) this.x = W + 10;
+                if (this.x > W + 10) this.x = -10;
+                if (this.y < -10) this.y = H + 10;
+                if (this.y > H + 10) this.y = -10;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(180, 180, 255, ${this.opacity})`;
+                ctx.fill();
+            }
+        }
+
+        for (let i = 0; i < COUNT; i++) {
+            particles.push(new Particle());
+        }
+
+        function drawLines() {
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < MAX_DIST) {
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        const alpha = (1 - dist / MAX_DIST) * 0.25;
+                        ctx.strokeStyle = `rgba(150, 150, 255, ${alpha})`;
+                        ctx.lineWidth = 0.8;
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, W, H);
+            for (const p of particles) {
+                p.update();
+                p.draw();
+            }
+            drawLines();
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        // 鼠标交互：粒子排斥
+        let mouseX = -9999, mouseY = -9999;
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+        document.addEventListener('mouseleave', () => {
+            mouseX = -9999;
+            mouseY = -9999;
+        });
+
+        // 在动画循环中额外处理交互
+        function interactLoop() {
+            for (const p of particles) {
+                const dx = p.x - mouseX;
+                const dy = p.y - mouseY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 120) {
+                    const force = (120 - dist) / 120 * 2;
+                    p.x += (dx / dist || 0) * force;
+                    p.y += (dy / dist || 0) * force;
+                }
+            }
+            requestAnimationFrame(interactLoop);
+        }
+        interactLoop();
+
+        // =============================================
+        //  2. 点击涟漪
+        // =============================================
+        const rippleContainer = document.getElementById('ripple-container');
+        document.addEventListener('click', (e) => {
+            const el = document.createElement('div');
+            el.className = 'ripple';
+            el.style.left = (e.clientX - 150) + 'px';
+            el.style.top = (e.clientY - 150) + 'px';
+            rippleContainer.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        });
+
+        // =============================================
+        //  3. 按钮彩蛋
+        // =============================================
+        const btn = document.getElementById('magic-btn');
+        const hue = [ '#f093fb', '#f5576c', '#4facfe', '#00f2fe', '#43e97b', '#fa709a' ];
+        let clickCount = 0;
+
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            clickCount++;
+            // 每次点击切换渐变色
+            const c1 = hue[clickCount % hue.length];
+            const c2 = hue[(clickCount + 1) % hue.length];
+            this.style.background = `linear-gradient(135deg, ${c1}, ${c2})`;
+
+            // 在按钮位置额外生成一个彩色涟漪
+            const rect = this.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            for (let i = 0; i < 8; i++) {
+                const dot = document.createElement('div');
+                dot.style.cssText = `
+                    position: fixed; left: ${cx}px; top: ${cy}px;
+                    width: 6px; height: 6px; border-radius: 50%;
+                    background: ${hue[Math.floor(Math.random() * hue.length)]};
+                    pointer-events: none; z-index: 3;
+                    transition: all 0.8s cubic-bezier(.25,.46,.45,.94);
+                `;
+                document.body.appendChild(dot);
+                const angle = (i / 8) * Math.PI * 2;
+                const dist = 40 + Math.random() * 60;
+                requestAnimationFrame(() => {
+                    dot.style.transform = `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px)`;
+                    dot.style.opacity = '0';
+                });
+                setTimeout(() => dot.remove(), 900);
+            }
+        });
+    </script>
+</body>
+</html>
