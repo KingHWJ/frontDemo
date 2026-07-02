@@ -1,0 +1,135 @@
+{% extends "layout.html" %}
+
+{% block title %}首页 - 数栈实时任务发布台{% endblock %}
+
+{% block content %}
+<section class="home-header">
+    <div>
+        <h1 class="page-title">首页</h1>
+        <p>全局总览数栈发布链路；项目空间只在任务列表和发布确认中作为发布上下文。</p>
+    </div>
+    <span>元数据同步：{{ last_metadata_sync_at }}</span>
+</section>
+
+<nav class="tabs home-view-tabs" aria-label="首页视图筛选">
+    {% for tab in home_view_tabs %}
+    <a class="{% if home_view == tab.key %}active{% endif %}" href="/home?view={{ tab.key }}">{{ tab.label }}</a>
+    {% endfor %}
+</nav>
+
+<section class="home-stat-grid">
+    {% for stat in home_stats %}
+    <article class="stat-card {{ stat.tone }}">
+        <span class="stat-icon">{{ stat.icon }}</span>
+        <div>
+            <p>{{ stat.label }}</p>
+            <strong>{{ stat.value }}</strong>
+            <small>{{ stat.desc }}</small>
+        </div>
+    </article>
+    {% endfor %}
+</section>
+
+<section class="home-grid">
+    <article class="card home-panel release-overview">
+        <h2>发布状态概览</h2>
+        <div class="donut-wrap">
+            <div class="donut-chart">
+                <strong>{{ records|length }}</strong>
+                <span>近期发布</span>
+            </div>
+            <div class="donut-legend">
+                <span><i class="ok"></i>成功 {{ records|selectattr("status", "equalto", "成功")|list|length }}</span>
+                <span><i class="bad"></i>失败 {{ records|selectattr("status", "equalto", "失败")|list|length }}</span>
+                <span><i class="wait"></i>其他 {{ records|rejectattr("status", "equalto", "成功")|rejectattr("status", "equalto", "失败")|list|length }}</span>
+            </div>
+        </div>
+    </article>
+
+    <article class="card home-panel daily-release-panel">
+        <h2>每日发布</h2>
+        <div class="daily-release-chart" aria-label="每日发布柱状图">
+            {% for day in daily_release_chart %}
+            <div class="bar-item">
+                <div class="bar-track">
+                    <span class="bar-fill" style="height: {{ day.height }}%"></span>
+                </div>
+                <strong>{{ day.total }}</strong>
+                <small>{{ day.label }}</small>
+            </div>
+            {% endfor %}
+        </div>
+        <p class="chart-note">按发布开始日期统计，柱高代表当天批次数。</p>
+    </article>
+</section>
+
+{% if home_view == "project" %}
+<section class="card table-card">
+    <h2>项目空间与仓库</h2>
+    <div class="table-wrap">
+        <table class="data-table home-table">
+            <thead>
+            <tr><th>项目空间</th><th>模块</th><th>数栈空间 ID</th><th>Git 仓库</th><th>主分支</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+            {% for project in project_spaces_overview %}
+            <tr>
+                <td>{{ project.project_name }}</td>
+                <td><span class="tag">{{ project.project_type }}</span></td>
+                <td>{{ project.project_space_id }}</td>
+                <td><code class="short-code" title="{{ project.repo_url or '未配置' }}">{{ project.repo_url or "未配置" }}</code></td>
+                <td>{{ project.default_branch or "-" }}</td>
+                <td><a class="action-link" href="/tasks?project_space_id={{ project.id }}">进入任务列表</a></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% else %}
+<section class="home-main-grid">
+    <article class="card table-card">
+        <h2>已提交任务预览</h2>
+        <div class="table-wrap">
+            <table class="data-table home-table">
+                <thead>
+                <tr><th>任务名</th><th>模块</th><th>任务类型</th><th>项目空间</th><th>提交人</th><th>提交时间</th></tr>
+                </thead>
+                <tbody>
+                {% for task in tasks %}
+                <tr>
+                    <td>{{ task.name }}</td>
+                    <td><span class="tag {% if task.module == '离线' %}green{% endif %}">{{ task.module }}</span></td>
+                    <td>{{ task.task_type_label }}</td>
+                    <td>{{ task.project_space }}</td>
+                    <td>{{ task.submitter }}</td>
+                    <td>{{ task.submitted_at }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <aside class="home-side">
+        <article class="card home-panel quick-actions">
+            <h2>快捷操作</h2>
+            <a class="primary action-button" href="/tasks">选择项目空间并扫描变更</a>
+            <a class="secondary action-button" href="/confirm">进入发布确认</a>
+        </article>
+
+        <article class="card home-panel">
+            <h2>最近发布结果</h2>
+            <div class="mini-record-list">
+                {% for record in records %}
+                <a href="/records?keyword={{ record.id }}">
+                    <strong>{{ record.id }}</strong>
+                    <span class="status {{ record.status }}">{{ record.status }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </article>
+    </aside>
+</section>
+{% endif %}
+{% endblock %}

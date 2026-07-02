@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}数栈实时任务发布台{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}?v=20260630-front-fixes">
+</head>
+<body>
+<div class="app-shell">
+    <aside class="sidebar">
+        <a class="brand" href="/home" aria-label="数栈实时任务发布台首页">
+            <span class="brand-mark"><span></span><span></span><span></span></span>
+            <strong>数栈实时任务发布台</strong>
+        </a>
+        <nav class="side-nav" aria-label="主导航">
+            {% for item in nav_items %}
+            <a class="nav-item {% if active == item.key %}active{% endif %}" href="{{ item.path }}{% if item.key in ['tasks', 'confirm'] and selected_project_space %}?project_space_id={{ selected_project_space.id }}{% endif %}">
+                <span class="nav-icon">{{ item.icon }}</span>
+                <span>{{ item.label }}</span>
+            </a>
+            {% endfor %}
+        </nav>
+    </aside>
+
+    <div class="workspace">
+        <header class="topbar">
+            <div class="topbar-right">
+                {% if show_project_space_switcher %}
+                <form class="top-project-form" method="get" action="{{ request.url.path if request is defined else '/home' }}">
+                    <label>当前项目空间</label>
+                    <div class="top-project-select">
+                        <select name="project_space_id" onchange="this.form.submit()">
+                            {% for project_space in project_spaces|default([]) %}
+                            <option value="{{ project_space.id }}" {% if selected_project_space and project_space.id == selected_project_space.id %}selected{% endif %}>
+                                {{ project_space.option_label or project_space.project_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <span class="top-project-display">{{ selected_project_space.project_name or current_project }}</span>
+                        <span class="top-project-caret">▾</span>
+                    </div>
+                    <span class="module-badge {{ selected_project_space.module_tone|default('unknown') }}">{{ selected_project_space.module_label|default('未标识') }}</span>
+                </form>
+                {% endif %}
+                <span class="top-avatar">A</span>
+                <strong class="top-user-name">{{ user_name }}</strong>
+                <form class="logout-form" method="post" action="/logout">
+                    <button class="link-button" type="submit">退出</button>
+                </form>
+            </div>
+        </header>
+        <main class="content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+<script src="{{ url_for('static', path='/app.js') }}?v=20260630-front-fixes"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>无权限 - 数栈实时任务发布台</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}?v=20260630-front-fixes">
+</head>
+<body class="permission-body">
+<main class="permission-card">
+    <span class="permission-icon">!</span>
+    <h1>需要登录后访问</h1>
+    <p>当前页面需要有效的生产数栈登录态。请先登录，系统会加密保存生产 cookie 用于后续发布操作。</p>
+    <a class="primary large" href="/login">去登录</a>
+</main>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>登录 - 数栈实时任务发布台</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}?v=20260630-front-fixes">
+</head>
+<body class="login-body">
+<main class="login-page">
+    <section class="login-visual" aria-hidden="true">
+        <span></span><span></span><span></span>
+    </section>
+    <form class="login-card" method="post" action="/login" data-login-form>
+        <span class="login-logo"><i></i><i></i><i></i></span>
+        <h1>数栈实时任务发布台</h1>
+        <p>使用当前配置的数栈登录环境账号访问发布台</p>
+        {% if error %}<div class="login-error">{{ error }}</div>{% endif %}
+        <label class="login-input"><span>♙</span><input name="username" placeholder="请输入账号" value="{{ username }}" autocomplete="username" required></label>
+        <label class="login-input"><span>▣</span><input type="password" placeholder="请输入密码" autocomplete="current-password" data-login-password required><b>◎</b></label>
+        <input type="hidden" name="password_ciphertext" data-password-ciphertext>
+        <input type="hidden" name="key" data-captcha-key>
+        <input type="hidden" data-login-public-key>
+        <div class="captcha-row">
+            <label class="login-input captcha-input"><span>◎</span><input name="verify_code" placeholder="验证码" autocomplete="off" required></label>
+            <button class="captcha-image" type="button" data-action="refresh-captcha" aria-label="刷新验证码">加载中</button>
+        </div>
+        <div class="login-options">
+            <label><input name="remember" type="checkbox" checked> 记住账号</label>
+            <button class="link-button" type="button" data-action="refresh-captcha">刷新验证码</button>
+        </div>
+        <button class="primary large login-submit" type="submit">登 录</button>
+    </form>
+</main>
+<script src="{{ url_for('static', path='/vendor/sm2.js') }}?v=20260512-login-sm2"></script>
+<script src="{{ url_for('static', path='/app.js') }}?v=20260630-front-fixes"></script>
+</body>
+</html>

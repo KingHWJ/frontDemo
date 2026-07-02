@@ -1,0 +1,173 @@
+{% extends "layout.html" %}
+
+{% block title %}发布确认 - 数栈实时任务发布台{% endblock %}
+
+{% block content %}
+{% set selected_project = selected_project_space|default({}) %}
+<h1 class="page-title">发布确认</h1>
+
+<section class="card steps-card">
+    {% for item in [
+        {"name": "选择任务", "desc": "勾选待发布任务"},
+        {"name": "发布确认", "desc": "确认配置与映射"},
+        {"name": "发布中", "desc": "生成平台发布记录"},
+        {"name": "发布完成", "desc": "查看发布结果"},
+    ] %}
+    <a class="step {% if loop.index == step %}active{% elif loop.index < step %}done{% endif %}" href="/confirm?step={{ loop.index }}&project_space_id={{ selected_project.id }}&draft_id={{ draft_id }}&task_ids={{ selected_task_ids }}">
+        <b>{{ loop.index }}</b>
+        <span>{{ item.name }}</span>
+        <small>{{ item.desc }}</small>
+    </a>
+    {% endfor %}
+</section>
+
+{% if step == 1 %}
+<section class="card table-card confirm-select-card">
+    <div class="confirm-toolbar">
+        <div>
+            <h2>选择待发布任务</h2>
+            <p>默认选中最近 3 个任务，可多选后进入发布确认。</p>
+        </div>
+        <span class="tag">已选 <strong data-selected-count>{{ tasks|length }}</strong> 个</span>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+            <tr><th>选择</th><th>任务名</th><th>模块</th><th>Git 文件</th><th>发布文件</th><th>目录</th><th>状态</th></tr>
+            </thead>
+            <tbody>
+            {% for task in all_tasks %}
+            <tr>
+                <td><input class="select-task-checkbox" type="checkbox" value="{{ task.id }}" {% if task.id in selected_task_id_list %}checked{% endif %}></td>
+                <td><span class="name-link">{{ task.name }}</span></td>
+                <td><span class="tag {% if task.module == '离线' %}green{% endif %}">{{ task.module }}</span></td>
+                <td><code class="path-cell">{{ task.git_path or "-" }}</code></td>
+                <td><span class="status {% if task.release_file_status == '已就绪' %}已发布{% else %}发布失败{% endif %}">{{ task.release_file_status or "-" }}</span></td>
+                <td><span class="status {% if task.directory_status == '已匹配' %}已发布{% else %}未发布{% endif %}">{{ task.directory_status or "-" }}</span></td>
+                <td><span class="status {{ task.status }}">{{ task.status }}</span></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="form-actions">
+        <a class="secondary large" href="/tasks?project_space_id={{ selected_project.id }}">返回任务列表</a>
+        <button class="primary large" type="button" data-action="confirm-selected" data-project-space-id="{{ selected_project.id }}" data-draft-id="{{ draft_id }}">下一步：发布确认</button>
+    </div>
+</section>
+{% elif step == 2 %}
+<section class="confirm-grid">
+    <article class="card summary-card">
+        <h2>任务信息摘要</h2>
+        <dl class="detail-list">
+            <dt>任务数量</dt><dd>{{ tasks|length }}</dd>
+            <dt>任务名</dt>
+            <dd>
+                {% for task in tasks %}
+                <span>{{ task.name }}</span>
+                {% endfor %}
+            </dd>
+            <dt>源环境</dt><dd><span class="tag">{{ env_labels.source }}</span></dd>
+            <dt>源项目空间</dt><dd>{{ selected_project.project_name or "未选择项目空间" }}</dd>
+            <dt>目标环境</dt><dd><span class="tag green">{{ env_labels.target }}</span></dd>
+            <dt>目标项目空间</dt><dd>{{ target_project_name }}</dd>
+            <dt>提交人</dt><dd>{{ tasks[0].submitter if tasks else "-" }}</dd>
+            <dt>提交时间</dt><dd>{{ tasks[0].submitted_at if tasks else "-" }}</dd>
+            <dt>备注</dt><dd>当前阶段只生成平台发布记录，不调用真实数栈生产发布 API。</dd>
+            {% if draft.id %}
+            <dt>发布草稿</dt><dd>#{{ draft.id }} / {{ draft.scan_status }}</dd>
+            <dt>Git Commit</dt><dd><code>{{ draft.base_commit or "-" }}</code> → <code>{{ draft.head_commit or "-" }}</code></dd>
+            {% endif %}
+        </dl>
+    </article>
+
+    <article class="card mapping-card">
+        <h2>发布前校验 <small>ⓘ</small></h2>
+        <p class="notice-text">当前阶段只做平台库缓存、Git 文件、项目空间映射和数据源映射校验。</p>
+        <div class="validation-list">
+            {% for task in tasks %}
+            {% set checks = validation_groups.get(task.id|string, []) %}
+            <div class="validation-task">
+                <strong>{{ task.name }}</strong>
+                <span class="tag plain">{{ task.task_type_label }}</span>
+                <code>{{ task.git_path }}</code>
+            </div>
+            {% for check in checks %}
+            <div class="validation-row">
+                <span>{{ check.check_name }}</span>
+                <em class="status {% if check.status == '通过' %}已发布{% elif check.status == '失败' %}发布失败{% else %}未发布{% endif %}">{{ check.status }}</em>
+                <small>{{ check.message }}</small>
+            </div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+<section class="card mapping-card">
+        <h2>数据源映射配置 <small>ⓘ</small></h2>
+        <p class="notice-text">请确认平台库中已同步的测试/生产数据源候选映射。本阶段只读展示，不直接修改生产任务。</p>
+        <div class="mapping-list">
+            <div class="mapping-head"><span>测试数据源（源环境）</span><span></span><span>生产数据源（目标环境）</span><span>连通性</span></div>
+            {% for mapping in mappings %}
+            <div class="mapping-row">
+                <code>{{ mapping.source }}</code>
+                <b>→</b>
+                <input value="{{ mapping.target }}" readonly>
+                <span class="check-dot">✓</span>
+            </div>
+            {% endfor %}
+        </div>
+</section>
+
+<div class="form-actions">
+    <a class="secondary large" href="/confirm?step=1&project_space_id={{ selected_project.id }}&draft_id={{ draft_id }}&task_ids={{ selected_task_ids }}">上一步</a>
+    <form method="post" action="/confirm/publish" class="inline-form">
+        <input type="hidden" name="draft_id" value="{{ draft_id }}">
+        {% for task in tasks %}<input type="hidden" name="task_ids" value="{{ task.id }}">{% endfor %}
+        <button class="primary large" type="submit">生成非 API 发布记录</button>
+    </form>
+</div>
+{% elif step == 3 %}
+<section class="card publish-progress-card">
+    <h2>发布中</h2>
+    <p class="notice-text">当前阶段不调用数栈 API，只生成平台侧发布记录和校验留痕。</p>
+    <div class="publish-progress-list">
+        <div><span class="check-dot">✓</span><strong>发布前校验</strong><small>已基于 Web 元数据库生成校验结果</small></div>
+        <div><span class="check-dot muted">－</span><strong>生产任务 API</strong><small>暂未接入，后续替换执行层</small></div>
+        <div><span class="check-dot">✓</span><strong>记录留痕</strong><small>可生成非 API 阶段发布记录</small></div>
+    </div>
+</section>
+
+<div class="form-actions">
+    <a class="secondary large" href="/confirm?step=2&project_space_id={{ selected_project.id }}&draft_id={{ draft_id }}&task_ids={{ selected_task_ids }}">上一步</a>
+    <a class="primary large" href="/confirm?step=4&project_space_id={{ selected_project.id }}&draft_id={{ draft_id }}&task_ids={{ selected_task_ids }}">查看结果</a>
+</div>
+{% else %}
+<section class="card publish-result-card">
+    <h2>发布完成</h2>
+    <div class="result-summary">
+        <span class="check-dot">✓</span>
+        <strong>非 API 阶段确认完成</strong>
+        <small>本次共检查 {{ tasks|length }} 个任务，真实创建或更新生产任务会在后续 API 阶段接入。</small>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+            <tr><th>任务名</th><th>模块</th><th>提交人</th><th>结果</th></tr>
+            </thead>
+            <tbody>
+            {% for task in tasks %}
+            <tr><td>{{ task.name }}</td><td>{{ task.module }}</td><td>{{ task.submitter }}</td><td><span class="status 未发布">待接 API</span></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="form-actions">
+    <a class="secondary large" href="/confirm?step=1&project_space_id={{ selected_project.id }}&draft_id={{ draft_id }}">继续发布</a>
+    <a class="primary large" href="/records{% if tasks %}?keyword={{ tasks[0].name|urlencode }}{% endif %}">查看发布记录</a>
+</div>
+{% endif %}
+{% endblock %}

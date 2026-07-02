@@ -1,0 +1,125 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ page.title }} - 数栈实时发布台 v1{% endblock %}
+
+{% block content %}
+<section class="module-page">
+    <div class="module-header">
+        <div>
+            <span class="module-eyebrow">{{ page.title }}</span>
+            <h1>{{ page.title }}</h1>
+            <p>{{ page.desc }}</p>
+        </div>
+        {% if page.actions %}
+        <div class="module-actions">
+            {% for action in page.actions %}
+            <button class="primary small" type="button">{{ action }}</button>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% if page.steps %}
+    <div class="progress-steps">
+        {% for step in page.steps %}
+        <span class="{% if loop.index == page.active_step %}active{% elif loop.index < page.active_step %}done{% endif %}">
+            <b>{{ loop.index }}</b>{{ step }}
+        </span>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if page.tabs %}
+    <div class="module-tabs">
+        {% for tab in page.tabs %}
+        <button class="{% if loop.first %}active{% endif %}" type="button">{{ tab }}</button>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if page.filters %}
+    <form class="module-filters">
+        {% for item in page.filters %}
+        <label>{{ item.label }}
+            <select><option>{{ item.value }}</option></select>
+        </label>
+        {% endfor %}
+        <button class="primary small" type="button">查询</button>
+        <button class="secondary small" type="button">重置</button>
+    </form>
+    {% endif %}
+
+    {% if page.metrics %}
+    <div class="metric-strip">
+        {% for metric in page.metrics %}
+        <article class="metric-card {{ metric.tone }}">
+            <span>{{ metric.label }}</span>
+            <strong>{{ metric.value }}</strong>
+        </article>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="module-grid">
+        {% for section in page.sections %}
+        <section class="panel module-card span-{{ section.span|default(1) }}">
+            <div class="panel-title compact">
+                <h2>{{ section.title }}</h2>
+                {% if section.subtitle %}<span class="info-chip">{{ section.subtitle }}</span>{% endif %}
+            </div>
+
+            {% if section.headers %}
+            <table class="module-table">
+                <thead>
+                <tr>
+                    {% for header in section.headers %}
+                    <th>{{ header }}</th>
+                    {% endfor %}
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in section.rows %}
+                <tr>
+                    {% for cell in row %}
+                    <td>{{ cell }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            {% if section.list %}
+            <ul class="module-list">
+                {% for item in section.list %}
+                <li><span></span>{{ item }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+
+            {% if section.bars %}
+            <div class="trend-board">
+                {% for bar in section.bars %}
+                <i style="height: {{ bar }}"></i>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if section.settings %}
+            <div class="settings-form">
+                {% for item in section.settings %}
+                <label>{{ item[0] }}
+                    <input value="{{ item[1] }}" readonly>
+                </label>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </section>
+        {% endfor %}
+    </div>
+
+    {% if page.notice %}
+    <div class="notice-panel">{{ page.notice }}</div>
+    {% endif %}
+</section>
+{% endblock %}

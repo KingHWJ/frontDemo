@@ -1,0 +1,399 @@
+{% extends "layout.html" %}
+
+{% block title %}配置管理 - 数栈实时任务发布台{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1 class="page-title">配置管理</h1>
+        <p class="page-subtitle">统一维护测试/生产元数据映射、Git 绑定和自动生成的映射候选。</p>
+        {% if sync_message %}<p class="sync-message">{{ sync_message }}</p>{% endif %}
+        {% if config_message %}<p class="sync-message {% if config_status == 'success' %}success{% elif config_status %}failed{% endif %}">{{ config_message }}</p>{% endif %}
+    </div>
+    <div class="action-group">
+        <form method="post" action="/config/sync-metadata">
+            <button class="secondary" type="submit" data-action="sync-metadata">手动同步元数据</button>
+        </form>
+        <form method="post" action="/config/git-repos/refresh-all">
+            <button class="primary" type="submit">刷新全部 Git</button>
+        </form>
+    </div>
+</div>
+
+<section class="card config-section config-workbench-section" id="section-metasync">
+    <div class="section-heading">
+        <h2><span class="section-icon">⌘</span>元数据同步</h2>
+        <span class="section-hint">展示测试环境到生产环境的元数据快照同步状态，普通页面访问只读平台库缓存。</span>
+    </div>
+    <div class="config-meta-hero">
+        <div class="env-flow-main">
+            <span class="env-chip"><small>源环境</small><strong>{{ env_labels.source }}</strong><em>读取任务、目录和数据源</em></span>
+            <b class="env-arrow">→</b>
+            <span class="env-chip target"><small>目标环境</small><strong>{{ env_labels.target }}</strong><em>生成映射候选并供发布确认复用</em></span>
+        </div>
+        <div class="config-summary-grid config-summary-grid-five">
+            <span><small>目录数量</small><strong>{{ directory_sync.directory_count }}</strong></span>
+            <span><small>任务缓存</small><strong>{{ directory_sync.task_count }}</strong></span>
+            <span><small>数据源缓存</small><strong>{{ directory_sync.datasource_count }}</strong></span>
+            <span><small>最近同步时间</small><strong>{{ directory_sync.last_synced_at }}</strong></span>
+            <span><small>同步状态</small><em class="status {% if directory_sync.status == '已同步' %}已发布{% else %}未发布{% endif %}">{{ directory_sync.status }}</em></span>
+        </div>
+    </div>
+</section>
+
+<section class="card config-section" id="section-gitlab-creds">
+    <div class="section-heading">
+        <h2><span class="section-icon">⌬</span>GitLab 全局凭据</h2>
+        <span class="section-hint">所有项目空间 Git 仓库默认共用这一组凭据，密码留空表示不覆盖当前密文。</span>
+    </div>
+    <form method="post" action="/config/gitlab/save" class="gitlab-credential-form">
+        <label>
+            <span>GitLab 地址</span>
+            <input name="base_url" value="{{ gitlab_credential.base_url }}" placeholder="http://jnbygitlab.jnby.com">
+        </label>
+        <label>
+            <span>用户名</span>
+            <input name="username" value="{{ gitlab_credential.username }}" autocomplete="username">
+        </label>
+        <label>
+            <span>认证方式</span>
+            <select name="auth_mode">
+                <option value="password" {% if gitlab_credential.auth_mode != 'token' %}selected{% endif %}>用户名/密码</option>
+                <option value="token" {% if gitlab_credential.auth_mode == 'token' %}selected{% endif %}>Token</option>
+            </select>
+        </label>
+        <label>
+            <span>密码</span>
+            <input name="password" type="password" placeholder="{% if gitlab_credential.has_password == '已保存' %}********{% else %}留空则不修改{% endif %}" autocomplete="new-password">
+        </label>
+        <label>
+            <span>GitLab Token</span>
+            <input name="token" type="password" placeholder="{% if gitlab_credential.has_token == '已保存' %}********{% else %}留空则不修改{% endif %}" autocomplete="new-password">
+        </label>
+        <button class="primary" type="submit">保存凭据</button>
+        <button class="secondary" type="submit" formaction="/config/gitlab/test">保存并测试登录</button>
+    </form>
+    <div class="config-summary-grid compact">
+        <span><small>密码状态</small><strong>{{ gitlab_credential.has_password }}</strong></span>
+        <span><small>Token 状态</small><strong>{{ gitlab_credential.has_token }}</strong></span>
+        <span><small>API 检测时间</small><strong>{{ gitlab_credential.git_api_last_checked_at }}</strong></span>
+        <span><small>API 检测状态</small><em class="status {% if gitlab_credential.git_api_last_check_status == 'success' %}已发布{% else %}未发布{% endif %}">{{ gitlab_credential.git_api_last_check_status }}</em></span>
+        <span><small>最近检测时间</small><strong>{{ gitlab_credential.last_checked_at }}</strong></span>
+        <span><small>检测状态</small><em class="status {% if gitlab_credential.last_check_status == 'success' %}已发布{% else %}未发布{% endif %}">{{ gitlab_credential.last_check_status }}</em></span>
+    </div>
+</section>
+
+<section class="card config-section table-card config-table-card" data-min-rows="5" id="section-git-bindings">
+    <div class="section-heading">
+        <div>
+            <h2><span class="section-icon">⌁</span>项目空间 Git 绑定</h2>
+            <p class="config-caption">模块类型直接继承项目空间真实标记；这里只维护仓库地址、跟踪分支和 Git 刷新状态。</p>
+        </div>
+    </div>
+    <div class="table-wrap git-binding-wrap">
+        <table class="data-table config-git-table">
+            <thead>
+            <tr>
+                <th><button class="sort-header" type="button" data-sort-key="project" data-sort-type="text">项目空间 <span class="sort-mark">↕</span></button></th>
+                <th><button class="sort-header" type="button" data-sort-key="module" data-sort-type="text">模块类型 <span class="sort-mark">↕</span></button></th>
+                <th><button class="sort-header" type="button" data-sort-key="repo" data-sort-type="text">仓库地址 <span class="sort-mark">↕</span></button></th>
+                <th><button class="sort-header" type="button" data-sort-key="branch" data-sort-type="text">跟踪分支 <span class="sort-mark">↕</span></button></th>
+                <th><button class="sort-header" type="button" data-sort-key="commit" data-sort-type="text">最近 Commit <span class="sort-mark">↕</span></button></th>
+                <th><button class="sort-header" type="button" data-sort-key="refresh" data-sort-type="text">刷新状态 <span class="sort-mark">↕</span></button></th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for repo in git_bindings %}
+            <tr data-row data-git-binding-row data-keyword="{{ repo.project_name }} {{ repo.module_label }} {{ repo.repo_url }} {{ repo.current_branch }} {{ repo.last_refresh_status }}" data-sort-project="{{ repo.project_name }}" data-sort-module="{{ repo.module_label }}" data-sort-repo="{{ repo.repo_url or '' }}" data-sort-branch="{{ repo.current_branch or repo.default_branch or '' }}" data-sort-commit="{{ repo.latest_commit_id or '' }}" data-sort-refresh="{{ repo.last_refresh_status or '' }}">
+                <td><span class="project-cell">{{ repo.project_name }}</span></td>
+                <td><span class="tag {% if repo.module_type_value == 'offline' %}green{% endif %}">{{ repo.module_label }}</span></td>
+                <td class="config-code-cell">
+                    <input form="git-binding-form-{{ repo.project_space_id }}" type="hidden" name="project_space_id" value="{{ repo.project_space_id }}">
+                    <input form="git-binding-form-{{ repo.project_space_id }}" type="hidden" name="module_type" value="{{ repo.module_type_value }}">
+                    <input form="git-binding-form-{{ repo.project_space_id }}" class="config-input config-code-input" name="repo_url" value="{{ repo.repo_url or '' }}" disabled>
+                </td>
+                <td>
+                    <select form="git-binding-form-{{ repo.project_space_id }}" class="config-select config-branch-select" name="branch" data-git-branch-select data-current-branch="{{ repo.current_branch or repo.default_branch or 'master' }}" disabled>
+                        <option value="{{ repo.current_branch or repo.default_branch or 'master' }}" selected>{{ repo.current_branch or repo.default_branch or 'master' }}</option>
+                    </select>
+                </td>
+                <td>
+                    <code class="short-code" title="{{ repo.latest_commit_id or '-' }}">{{ (repo.latest_commit_id[:10] ~ '...') if repo.latest_commit_id and repo.latest_commit_id|length > 10 else (repo.latest_commit_id or '-') }}</code>
+                </td>
+                <td>
+                    <span class="status {% if repo.last_refresh_status == 'success' %}已发布{% elif repo.last_refresh_status == 'failed' %}失败{% else %}未发布{% endif %}">{{ repo.last_refresh_status or "未刷新" }}</span>
+                    <small>{{ repo.last_refreshed_at or "-" }}</small>
+                </td>
+                <td class="config-row-actions">
+                    <button class="link-button" type="button" data-action="edit-git-binding">编辑</button>
+                    <button class="link-button" type="button" data-action="load-git-branches" hidden>读取远端分支</button>
+                    <form id="git-binding-form-{{ repo.project_space_id }}" method="post" action="/config/git-repos/save" class="inline-form">
+                        <button class="link-button" type="submit" hidden>保存</button>
+                    </form>
+                    <button class="link-button" type="button" data-action="cancel-git-binding" hidden>取消</button>
+                    {% if repo.repo_id %}
+                    <form method="post" action="/config/git-repos/refresh" class="inline-form">
+                        <input type="hidden" name="repo_id" value="{{ repo.repo_id }}">
+                        <button class="link-button" type="submit">刷新提交</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            {% for _ in range(5) %}
+            <tr class="table-placeholder-row" data-placeholder-row hidden>
+                <td colspan="7"></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="table-empty" data-empty-state hidden>当前没有可配置的项目空间 Git 绑定。</p>
+    <div class="pagination" data-pagination data-page-size="10" data-page-size-options="5,10,20">
+        <span data-pagination-total>共 {{ git_bindings|length }} 条</span>
+        <button type="button" data-page-action="prev" disabled>‹</button>
+        <span data-page-buttons></span>
+        <button type="button" data-page-action="next">›</button>
+        <select data-page-size-select>
+            <option value="5">5 条/页</option>
+            <option value="10" selected>10 条/页</option>
+            <option value="20">20 条/页</option>
+        </select>
+        <label>跳至 <input data-page-jump value="1" inputmode="numeric"> 页</label>
+    </div>
+</section>
+
+<section class="config-mapping-grid">
+    <section class="card config-section table-card config-table-card" data-min-rows="5" id="section-project-mappings">
+        <div class="section-heading">
+            <div>
+                <h2><span class="section-icon">▣</span>项目空间映射</h2>
+                <p class="config-caption">系统按"同名 + 同模块"自动生成候选，当前页面展示平台库真实状态，并支持直接保存到平台库。</p>
+            </div>
+            <button class="secondary" type="button" data-action="add-project-mapping-row">新增映射</button>
+        </div>
+        <div class="config-inline-stats" data-config-stats="project-mapping">
+            <span><small>总数</small><strong data-stat-value="total">{{ project_mapping_stats.total }}</strong></span>
+            <span><small>已启用</small><strong data-stat-value="enabled">{{ project_mapping_stats.enabled }}</strong></span>
+            <span><small>待配置</small><strong data-stat-value="pending">{{ project_mapping_stats.pending }}</strong></span>
+            <span><small>离线</small><strong data-stat-value="offline">{{ project_mapping_stats.offline }}</strong></span>
+            <span><small>实时</small><strong data-stat-value="stream">{{ project_mapping_stats.stream }}</strong></span>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table config-project-table">
+                <thead>
+                <tr>
+                    <th>测试环境</th>
+                    <th>模块类型</th>
+                    <th>生产环境</th>
+                    <th>启用状态</th>
+                    <th>匹配规则</th>
+                    <th>最近同步</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody data-project-mapping-list>
+                {% for item in project_mappings %}
+                <tr data-row data-project-mapping-row data-project-mapping-id="{{ item.mapping_id or item.row_id }}" data-source-project-space-id="{{ item.source_project_space_id }}" data-target-project-space-id="{{ item.target_project_space_id or '' }}" data-mapping-enabled="{{ item.mapping_enabled }}" data-keyword="{{ item.source_space }} {{ item.target_space }} {{ item.status }} {{ item.match_rule }}" data-source-space="{{ item.source_space }}" data-target-space="{{ item.target_space }}" data-status="{{ item.status }}" data-source-env="{{ item.source_env }}" data-target-env="{{ item.target_env or env_labels.target }}" data-source-type="{{ item.source_type or '' }}">
+                    <td>
+                        <span class="cell-display project-cell">{{ item.source_space }}</span>
+                        <select class="config-select cell-editor" data-field="source_space" hidden>
+                            {% for option in project_space_options.source %}
+                            <option value="{{ option.id }}" {% if option.id|string == item.source_project_space_id|string %}selected{% endif %}>{{ option.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td><span class="tag {% if item.source_type == 'offline' %}green{% endif %}" data-project-type-label>{{ item.source_type_label }}</span></td>
+                    <td>
+                        <span class="cell-display project-cell" data-project-target-display>{{ item.target_space or "未配置" }}</span>
+                        <select class="config-select cell-editor" data-field="target_space" hidden>
+                            <option value="">请选择生产项目空间</option>
+                            {% for option in project_space_options.target %}
+                            <option value="{{ option.id }}" {% if option.id|string == item.target_project_space_id|string %}selected{% endif %}>{{ option.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td><span class="status {% if item.mapping_enabled and item.target_space %}已发布{% else %}未发布{% endif %}" data-project-mapping-status>{{ "启用" if item.mapping_enabled and item.target_space else ("停用" if not item.mapping_enabled and item.target_space else "待配置") }}</span></td>
+                    <td><span data-project-match-rule>{{ item.match_rule }}</span></td>
+                    <td><span data-project-last-synced>{{ item.last_synced_at }}</span></td>
+                    <td class="config-row-actions">
+                        <button class="link-button" type="button" data-action="edit-project-mapping">编辑</button>
+                        <button class="link-button" type="button" data-action="toggle-project-mapping">{{ "停用" if item.mapping_enabled and item.target_space else "启用" }}</button>
+                        <button class="link-button" type="button" data-action="save-project-mapping" hidden>保存</button>
+                        <button class="link-button" type="button" data-action="cancel-project-mapping" hidden>取消</button>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% for _ in range(5) %}
+                <tr class="table-placeholder-row" data-placeholder-row hidden>
+                    <td colspan="7"></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="table-empty" data-empty-state hidden>当前没有项目空间映射，可新增一条映射或先同步元数据。</p>
+        <div class="pagination" data-pagination data-page-size="10" data-page-size-options="5,10,20">
+            <span data-pagination-total>共 {{ project_mappings|length }} 条</span>
+            <button type="button" data-page-action="prev" disabled>‹</button>
+            <span data-page-buttons></span>
+            <button type="button" data-page-action="next">›</button>
+            <select data-page-size-select>
+                <option value="5">5 条/页</option>
+                <option value="10" selected>10 条/页</option>
+                <option value="20">20 条/页</option>
+            </select>
+            <label>跳至 <input data-page-jump value="1" inputmode="numeric"> 页</label>
+        </div>
+    </section>
+
+    <section class="card config-section table-card config-table-card config-datasource-card" data-min-rows="5" id="section-datasource-mappings">
+        <div class="section-heading">
+            <div>
+                <h2><span class="section-icon">▤</span>数据源映射配置</h2>
+                <p class="config-caption">候选数据源来自已同步的测试环境真实数据源；生产环境数据源由人工手动选择映射，待选项也来自生产环境真实数据源。保存后再次进入页面时展示已保存状态。</p>
+            </div>
+            <button class="secondary" type="button" data-action="add-datasource-row">新增映射</button>
+        </div>
+        <div class="config-inline-stats" data-config-stats="datasource-mapping">
+            <span><small>总数</small><strong data-stat-value="total">{{ datasource_mapping_stats.total }}</strong></span>
+            <span><small>已启用</small><strong data-stat-value="enabled">{{ datasource_mapping_stats.enabled }}</strong></span>
+            <span><small>待配置</small><strong data-stat-value="pending">{{ datasource_mapping_stats.pending }}</strong></span>
+            <span><small>状态正常</small><strong data-stat-value="connected">{{ datasource_mapping_stats.connected }}</strong></span>
+            <span><small>状态失败</small><strong data-stat-value="failed">{{ datasource_mapping_stats.failed }}</strong></span>
+        </div>
+        <p class="config-note">原则上每个测试环境数据源都需要配置一个生产环境映射关系。未配置显示"待配置"，已保存显示"已保存"。</p>
+        <div class="table-wrap">
+            <table class="data-table config-datasource-table">
+                <thead>
+                <tr>
+                    <th>测试环境数据源</th>
+                    <th>数据源类型</th>
+                    <th>生产环境数据源</th>
+                    <th>启用状态</th>
+                    <th>资源状态</th>
+                    <th>最近同步</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody data-datasource-list>
+                {% for mapping in datasource_mappings %}
+                <tr data-row data-datasource-row data-datasource-row-id="{{ mapping.mapping_id or mapping.row_id }}" data-source-resource-id="{{ mapping.row_id }}" data-source="{{ mapping.source }}" data-type="{{ mapping.type }}" data-target="{{ mapping.target }}" data-target-resource-id="{{ mapping.target_resource_id or '' }}" data-mapping-enabled="{{ mapping.mapping_enabled }}" data-connectivity-status="{{ mapping.connectivity_status or 'unknown' }}" data-keyword="{{ mapping.source }} {{ mapping.type }} {{ mapping.target }} {{ mapping.source_project_name }} {{ mapping.mapping_status }}">
+                    <td><span class="datasource-value" title="{{ mapping.source }}">{{ mapping.source }}</span></td>
+                    <td><span class="tag plain" data-datasource-type>{{ mapping.type }}</span></td>
+                    <td>
+                        <select class="config-select datasource-target-select" data-datasource-target disabled>
+                            <option value=""></option>
+                            {% for option in datasource_options.target %}
+                            <option value="{{ option.id }}" {% if option.id|string == mapping.target_resource_id|string %}selected{% endif %}>{{ option.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td><span class="status {% if mapping.mapping_enabled and mapping.target %}已发布{% else %}未发布{% endif %}" data-datasource-status>{{ "启用" if mapping.mapping_enabled and mapping.target else ("停用" if not mapping.mapping_enabled and mapping.target else "待配置") }}</span></td>
+                    <td><span class="status {% if mapping.connectivity_status == 'connected' %}已发布{% elif mapping.connectivity_status == 'failed' %}失败{% else %}未发布{% endif %}" data-datasource-connectivity>{{ "正常" if mapping.connectivity_status == "connected" else ("失败" if mapping.connectivity_status == "failed" else "未知") }}</span></td>
+                    <td><span data-datasource-last-synced>{{ mapping.last_synced_at }}</span></td>
+                    <td class="config-row-actions">
+                        <button class="link-button" type="button" data-action="edit-datasource">编辑</button>
+                        <button class="link-button" type="button" data-action="toggle-datasource">{{ "停用" if mapping.mapping_enabled and mapping.target else "启用" }}</button>
+                        <button class="link-button" type="button" data-action="save-datasource" hidden>保存</button>
+                        <button class="link-button" type="button" data-action="cancel-datasource" hidden>取消</button>
+                        <button class="link-button danger-link compact" type="button" data-action="clear-datasource" hidden>清空</button>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% for _ in range(5) %}
+                <tr class="table-placeholder-row" data-placeholder-row hidden>
+                    <td colspan="7"></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="table-empty" data-empty-state hidden>当前没有测试环境数据源缓存，请先同步元数据。</p>
+        <div class="pagination" data-pagination data-page-size="10" data-page-size-options="5,10,20">
+            <span data-pagination-total>共 {{ datasource_mappings|length }} 条</span>
+            <button type="button" data-page-action="prev" disabled>‹</button>
+            <span data-page-buttons></span>
+            <button type="button" data-page-action="next">›</button>
+            <select data-page-size-select>
+                <option value="5">5 条/页</option>
+                <option value="10" selected>10 条/页</option>
+                <option value="20">20 条/页</option>
+            </select>
+            <label>跳至 <input data-page-jump value="1" inputmode="numeric"> 页</label>
+        </div>
+        <div class="config-footer-actions">
+            <button class="primary" type="button" data-action="save-all-datasource">保存配置</button>
+        </div>
+    </section>
+</section>
+
+<template id="project-mapping-row-template">
+    <tr data-row data-project-mapping-row data-project-mapping-id="" data-source-project-space-id="" data-target-project-space-id="" data-mapping-enabled="1" data-source-space="" data-target-space="" data-status="draft" data-source-env="{{ env_labels.source }}" data-target-env="{{ env_labels.target }}" data-keyword="">
+        <td>
+            <span class="cell-display project-cell" hidden>请选择测试项目空间</span>
+            <select class="config-select cell-editor" data-field="source_space">
+                <option value="">请选择测试项目空间</option>
+                {% for option in project_space_options.source %}
+                <option value="{{ option.id }}">{{ option.label }}</option>
+                {% endfor %}
+            </select>
+        </td>
+        <td><span class="tag plain" data-project-type-label>待带出</span></td>
+        <td>
+            <span class="cell-display project-cell" data-project-target-display hidden>请选择生产项目空间</span>
+            <select class="config-select cell-editor" data-field="target_space">
+                <option value="">请选择生产项目空间</option>
+                {% for option in project_space_options.target %}
+                <option value="{{ option.id }}">{{ option.label }}</option>
+                {% endfor %}
+            </select>
+        </td>
+        <td><span class="status" data-project-mapping-status>待保存</span></td>
+        <td><span data-project-match-rule>manual</span></td>
+        <td><span data-project-last-synced>待保存</span></td>
+        <td class="config-row-actions">
+            <button class="link-button" type="button" data-action="save-project-mapping">保存</button>
+            <button class="link-button" type="button" data-action="cancel-project-mapping">取消</button>
+        </td>
+    </tr>
+</template>
+
+<template id="datasource-row-template">
+    <tr data-row data-datasource-row data-datasource-row-id="" data-source-resource-id="" data-source="" data-type="" data-target="" data-target-resource-id="" data-mapping-enabled="1" data-keyword="" data-editing="1">
+        <td>
+            <select class="config-select datasource-source-select" data-datasource-source>
+                <option value="">请选择测试环境数据源</option>
+                {% for option in datasource_options.source %}
+                <option value="{{ option.id }}">{{ option.label }}</option>
+                {% endfor %}
+            </select>
+        </td>
+        <td><span class="tag plain" data-datasource-type>待带出</span></td>
+        <td>
+            <select class="config-select datasource-target-select" data-datasource-target>
+                <option value="">请选择生产环境数据源</option>
+                {% for option in datasource_options.target %}
+                <option value="{{ option.id }}">{{ option.label }}</option>
+                {% endfor %}
+            </select>
+        </td>
+        <td><span class="status" data-datasource-status>待保存</span></td>
+        <td><span class="status 未发布" data-datasource-connectivity>未知</span></td>
+        <td><span data-datasource-last-synced>待保存</span></td>
+        <td class="config-row-actions">
+            <button class="link-button" type="button" data-action="save-datasource">保存</button>
+            <button class="link-button" type="button" data-action="cancel-datasource">取消</button>
+        </td>
+    </tr>
+</template>
+
+<script id="config-page-data" type="application/json">
+{{ {
+    "projectSpaceOptions": project_space_options,
+    "datasourceOptions": datasource_options,
+    "datasourceResources": datasource_resources
+} | tojson }}
+</script>
+{% endblock %}

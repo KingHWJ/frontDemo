@@ -1,0 +1,114 @@
+{% extends "layout.html" %}
+
+{% block title %}任务列表 - 数栈实时任务发布台{% endblock %}
+
+{% block content %}
+{% set git = git_context|default({}) %}
+{% set selected_project = selected_project_space|default({}) %}
+<h1 class="page-title">任务列表</h1>
+
+<section class="card task-flow-card">
+    <div class="task-flow-head">
+        <div>
+            <strong>{{ selected_project.project_name or "未选择项目空间" }}</strong>
+            <span>根据当前项目空间对应仓库生成待发布任务</span>
+        </div>
+        <a class="primary action-button" href="/tasks?project_space_id={{ selected_project.id }}&refresh=1">刷新 Git 差异</a>
+    </div>
+    <div class="task-flow-meta">
+        <span>仓库：<code>{{ git.repo_url or "未配置" }}</code></span>
+        <span>跟踪分支：<code>{{ git.branch or "-" }}</code></span>
+        <span>模块类型：<code>{{ git.module_label or "-" }}</code></span>
+        <span>已发布 Commit：<code>{{ git.last_success_commit or "-" }}</code></span>
+        <span>最新 Commit：<code>{{ git.current_commit or "-" }}</code></span>
+        <span>待发布任务：<strong>{{ git.task_candidate_count or 0 }}</strong></span>
+    </div>
+    {% if git.message %}
+    <p class="flow-message {{ git.status or 'warning' }}">{{ git.message }}</p>
+    {% endif %}
+</section>
+
+<nav class="tabs module-tabs" aria-label="任务模块筛选">
+    <a class="active" href="#" data-tab-filter="">所有</a>
+    <a href="#" data-tab-filter="离线">离线</a>
+    <a href="#" data-tab-filter="实时">实时</a>
+</nav>
+
+<section class="stat-grid task-stat-grid" data-task-stats>
+    {% for stat in stats %}
+    <article class="stat-card {{ stat.tone }} {% if loop.first %}active{% endif %}" role="button" tabindex="0" data-stat-card data-stat-key="{{ stat.key }}" data-stat-filter="{{ stat.filter }}">
+        <span class="stat-icon">{{ stat.icon }}</span>
+        <div>
+            <p>{{ stat.label }}</p>
+            <strong data-stat-value="{{ stat.key }}">{{ stat.value }}</strong>
+        </div>
+    </article>
+    {% endfor %}
+</section>
+
+<section class="card filter-card task-filter" data-filter-scope="tasks">
+    <input type="hidden" data-filter="module" value="">
+    <label>任务搜索<input data-filter="keyword" placeholder="任务名、类型、模块、项目空间、Git 路径"></label>
+    <label>发布状态<select data-filter="status"><option value="">全部状态</option><option>未发布</option><option>已发布</option><option>发布失败</option></select></label>
+    <button class="primary" type="button" data-action="filter-table">查询</button>
+    <button class="secondary" type="button" data-action="reset-filter">重置</button>
+</section>
+
+<section class="card table-card">
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th><button class="sort-header" type="button" data-sort-key="name" data-sort-type="text">任务名 <span class="sort-mark">↕</span></button></th>
+                <th><button class="sort-header" type="button" data-sort-key="taskType" data-sort-type="text">任务类型 <span class="sort-mark">↕</span></button></th>
+                <th><button class="sort-header" type="button" data-sort-key="module" data-sort-type="text">模块标签 <span class="sort-mark">↕</span></button></th>
+                <th><button class="sort-header" type="button" data-sort-key="project" data-sort-type="text">项目空间 <span class="sort-mark">↕</span></button></th>
+                <th><button class="sort-header" type="button" data-sort-key="gitPath" data-sort-type="text">文件名 <span class="sort-mark">↕</span></button></th>
+                <th><button class="sort-header active desc" type="button" data-sort-key="submitted" data-sort-type="date">提交时间 <span class="sort-mark">↓</span></button></th>
+                <th><button class="sort-header" type="button" data-sort-key="submitter" data-sort-type="text">提交人 <span class="sort-mark">↕</span></button></th>
+                <th><button class="sort-header" type="button" data-sort-key="status" data-sort-type="text">任务状态 <span class="sort-mark">↕</span></button></th>
+                <th><button class="sort-header" type="button" data-sort-key="action" data-sort-type="text">操作 <span class="sort-mark">↕</span></button></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for task in tasks %}
+            <tr data-row data-keyword="{{ task.name }} {{ task.task_type_label }} {{ task.module }} {{ task.project_space }} {{ task.git_path }} {{ task.metadata_status }} {{ task.release_file_status }} {{ task.directory_status }} {{ task.submitter }} {{ task.status }}" data-module="{{ task.module }}" data-status="{{ task.status }}" data-sort-name="{{ task.name }}" data-sort-task-type="{{ task.task_type_label }}" data-sort-module="{{ task.module }}" data-sort-project="{{ task.project_space }}" data-sort-git-path="{{ task.git_path }}" data-sort-submitted="{{ task.submitted_at }}" data-sort-submitter="{{ task.submitter }}" data-sort-metadata="{{ task.metadata_status }}" data-sort-release-file="{{ task.release_file_status }}" data-sort-directory="{{ task.directory_status }}" data-sort-status="{{ task.status }}" data-sort-action="{% if task.status == '未发布' %}发布确认{% else %}查看记录{% endif %}">
+                <td><span class="name-link">{{ task.name }}</span></td>
+                <td><span class="tag plain">{{ task.task_type_label }}</span></td>
+                <td><span class="tag {% if task.module == '离线' %}green{% endif %}">{{ task.module }}</span></td>
+                <td><span class="project-cell">{{ task.project_space }}</span></td>
+                <td><code class="path-cell" title="{{ task.git_path }}">{{ task.name }}.sql</code></td>
+                <td>{{ task.submitted_at or "-" }}</td>
+                <td>{{ task.submitter or "-" }}</td>
+                <td><span class="status {{ task.status }}">{{ task.status }}</span></td>
+                <td>
+                    {% if task.status == "未发布" %}
+                    <a class="action-link" href="/confirm?step=2&project_space_id={{ selected_project.id }}&draft_id={{ draft_info.draft_id }}&task_ids={{ task.id }}">发布确认</a>
+                    {% else %}
+                    <a class="action-link" href="/records?keyword={{ task.name|urlencode }}">查看记录</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="table-empty" data-empty-state hidden>未找到匹配任务</p>
+    <div class="pagination" data-pagination data-page-size="{{ pagination.page_size }}">
+        <span data-pagination-total>共 {{ pagination.total }} 条</span>
+        <button type="button" data-page-action="prev" disabled>‹</button>
+        <span data-page-buttons>
+            {% for page in range(1, pagination.page_count + 1) %}
+            <button type="button" data-page-number="{{ page }}" class="{% if loop.first %}active{% endif %}">{{ page }}</button>
+            {% endfor %}
+        </span>
+        <button type="button" data-page-action="next">›</button>
+        <select data-page-size-select>
+            {% for size in [10, 20, 30, 40, 50] %}
+            <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} 条/页</option>
+            {% endfor %}
+        </select>
+        <label>跳至 <input data-page-jump value="1" inputmode="numeric"> 页</label>
+    </div>
+</section>
+{% endblock %}

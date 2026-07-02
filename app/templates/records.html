@@ -1,0 +1,106 @@
+{% extends "layout.html" %}
+
+{% block title %}发布记录 - 数栈实时任务发布台{% endblock %}
+
+{% block content %}
+<h1 class="page-title">发布记录</h1>
+
+<section class="card filter-card" data-filter-scope="records">
+    <label>任务名<input data-filter="keyword" placeholder="请输入任务名" value="{{ keyword }}"></label>
+    <label>日期范围<span class="range-input"><input data-filter="start" placeholder="开始日期"><b>~</b><input data-filter="end" placeholder="结束日期"></span></label>
+    <label>发布状态<select data-filter="status"><option value="">全部状态</option><option>成功</option><option>失败</option><option>进行中</option></select></label>
+    <button class="primary" type="button" data-action="filter-table">查询</button>
+    <button class="secondary" type="button" data-action="reset-filter">重置</button>
+</section>
+
+<section class="stat-grid compact">
+    {% for stat in stats %}
+    <article class="stat-card {{ stat.tone }}">
+        <span class="stat-icon">{{ stat.icon }}</span>
+        <div>
+            <p>{{ stat.label }}</p>
+            <strong>{{ stat.value }}</strong>
+        </div>
+    </article>
+    {% endfor %}
+</section>
+
+<section class="card table-card">
+    <nav class="tabs" aria-label="发布记录类型筛选">
+        <a class="active" href="#" data-tab-filter="">所有</a>
+        <a href="#" data-tab-filter="成功">成功</a>
+        <a href="#" data-tab-filter="失败">失败</a>
+    </nav>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+            <tr><th>ID</th><th>任务名</th><th>源环境</th><th>目标环境</th><th>开始时间</th><th>结束时间</th><th>状态</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+            {% for record in records %}
+            <tr data-row data-keyword="{{ record.task_name }} {{ record.source_env }} {{ record.target_env }} {{ record.status }}" data-status="{{ record.status }}" data-start="{{ record.start }}">
+                <td>{{ record.id }}</td>
+                <td>{{ record.task_name }}</td>
+                <td>{{ record.source_env }}</td>
+                <td>{{ record.target_env }}</td>
+                <td>{{ record.start }}</td>
+                <td>{{ record.end }}</td>
+                <td><span class="status {{ record.status }}">{{ record.status }}</span></td>
+                <td><a class="action-link" href="/records/{{ record.batch_db_id }}">详情</a></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="table-empty" data-empty-state hidden>未找到匹配发布记录</p>
+    <div class="pagination" data-pagination data-page-size="{{ pagination.page_size }}">
+        <span data-pagination-total>共 {{ pagination.total }} 条</span>
+        <select><option>{{ pagination.page_size }} 条/页</option></select>
+        <button disabled>‹</button>
+        <span data-page-buttons>
+            {% for page in range(1, pagination.page_count + 1) %}
+            <button class="{% if loop.first %}active{% endif %}">{{ page }}</button>
+            {% endfor %}
+        </span>
+        <button>›</button>
+        <label>跳至 <input value="1"> 页</label>
+    </div>
+</section>
+
+{% if record_detail.record %}
+<section class="card table-card record-detail-card">
+    <div class="section-heading">
+        <h2>发布记录详情</h2>
+        <span class="section-hint">{{ record_detail.record.batch_code }} / {{ record_detail.record.release_status }}</span>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+            <tr><th>任务名</th><th>模块</th><th>提交人</th><th>Git 文件</th><th>结果</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+            {% for task in record_detail.tasks %}
+            <tr>
+                <td>{{ task.task_name }}</td>
+                <td>{{ task.module }}</td>
+                <td>{{ task.submitter }}</td>
+                <td><code class="path-cell">{{ task.sql_repo_path or "-" }}</code></td>
+                <td><span class="status {{ task.status }}">{{ task.status }}</span></td>
+                <td>{{ task.failure_reason or "-" }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="step-log-list">
+        {% for log in record_detail.logs %}
+        <div class="step-log-row">
+            <strong>{{ log.step_name }}</strong>
+            <span class="status {% if log.status == '通过' %}已发布{% elif log.status == '校验阻断' %}发布失败{% else %}未发布{% endif %}">{{ log.status }}</span>
+            <small>{{ log.response_summary or log.error_message or "-" }}</small>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

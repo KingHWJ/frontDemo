@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+
+{% block title %}Git 代码管理 - 数栈实时任务发布台{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Git 代码管理</h1>
+
+<section class="project-row">
+    <span class="info-note">当前展示平台库中已绑定的真实项目空间与提交缓存。</span>
+</section>
+
+<section class="card git-info-card">
+    <h2>仓库信息</h2>
+    <div class="git-info-grid">
+        <span>仓库地址</span><code class="short-code" title="{{ git.repo.repo_url }}">{{ git.repo.repo_url }}</code>
+        <span>默认分支</span><code class="short-code" title="{{ git.repo.default_branch }}">{{ git.repo.default_branch }}</code>
+        <span>分支</span><code class="short-code" title="{{ git.repo.current_branch }}">{{ git.repo.current_branch }}</code>
+        <span>最近提交时间</span><b>{{ git.repo.latest_commit_time }}</b>
+        <span>最近提交 ID</span><code class="short-code" title="{{ git.repo.latest_commit_id }}">{{ (git.repo.latest_commit_id[:10] ~ '...') if git.repo.latest_commit_id and git.repo.latest_commit_id|length > 10 else (git.repo.latest_commit_id or '-') }}</code>
+        <span>提交人</span><code class="short-code" title="{{ git.repo.latest_commit_author }}">{{ git.repo.latest_commit_author }}</code>
+        <span></span><span></span>
+        <span>提交信息</span><code class="short-code" title="{{ git.repo.latest_commit_message }}">{{ git.repo.latest_commit_message }}</code>
+    </div>
+</section>
+
+<section class="card table-card">
+    <h2>项目空间绑定</h2>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+            <tr><th>项目空间</th><th>模块类型</th><th>仓库地址</th><th>跟踪分支</th><th>最新 Commit</th></tr>
+            </thead>
+            <tbody>
+            {% for binding in git.bindings %}
+            <tr>
+                <td>{{ binding.project_name }}</td>
+                <td><span class="tag {% if binding.module_type_value == 'offline' %}green{% endif %}">{{ binding.module_label }}</span></td>
+                <td><code class="short-code" title="{{ binding.repo_url or '-' }}">{{ binding.repo_url or "-" }}</code></td>
+                <td>{{ binding.current_branch or "-" }}</td>
+                <td><code class="short-code" title="{{ binding.latest_commit_id or '-' }}">{{ (binding.latest_commit_id[:10] ~ '...') if binding.latest_commit_id and binding.latest_commit_id|length > 10 else (binding.latest_commit_id or '-') }}</code></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="card table-card">
+    <h2>提交历史</h2>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+            <tr><th>提交 ID</th><th>提交时间</th><th>提交人</th><th>提交信息</th><th>变更文件数</th></tr>
+            </thead>
+            <tbody>
+            {% for commit in git.commits %}
+            <tr>
+                <td><code class="short-code" title="{{ commit.commit }}">{{ (commit.commit[:10] ~ '...') if commit.commit and commit.commit|length > 10 else commit.commit }}</code></td>
+                <td>{{ commit.time }}</td>
+                <td>{{ commit.author }}</td>
+                <td title="{{ commit.message }}">{{ commit.message }}</td>
+                <td><span class="tag">{{ commit.files }}</span></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination"><span>共 {{ pagination.total }} 条</span><select><option>{{ pagination.page_size }} 条/页</option></select><button disabled>‹</button>{% for page in range(1, pagination.page_count + 1) %}<button class="{% if loop.first %}active{% endif %}">{{ page }}</button>{% endfor %}<button>›</button></div>
+</section>
+{% endblock %}
